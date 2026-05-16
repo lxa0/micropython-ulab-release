@@ -1,41 +1,30 @@
-name: Build Releases
-
+name: Build RP2040 MicroPython with ulab
 on:
   workflow_dispatch:
-#  push:
-#    branches: [ "main" ]
-#  pull_request:
-#    branches: [ "main" ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Install requirements
-      run: |
-        sudo apt-get update
-        sudo apt-get upgrade -y
-        sudo apt-get install build-essential subversion git-core libncurses5-dev zlib1g-dev gawk flex quilt libssl-dev xsltproc libxml-parser-perl \
-          mercurial bzr ecj cvs unzip lib32z1 lib32z1-dev lib32stdc++6 libstdc++6 libmpc-dev libgmp-dev tree liblua5.1-dev gcc-arm-none-eabi \
-          gcc-arm-linux-gnueabi python3 -y
+      - name: Install dependencies
+        run: sudo apt update && sudo apt install -y gcc-arm-none-eabi python3 git
 
-    - name: Clone Repository
-      run: git clone https://github.com/v923z/micropython-ulab.git ulab
-        
-    - name: Build for RP2
-      run: |
-        cd ulab/build
-        chmod +x rp2.sh
-        ./rp2.sh
-          
-    - name: Upload result as release
-      uses: ncipollo/release-action@v1
-      with:
-        artifacts: "${{ github.workspace }}/ulab/build/micropython/ports/rp2/build-RPI_PICO/firmware.*"
-#        body: ""
-        token: ${{ secrets.GITHUB_TOKEN }}
-        tag: "RP2-Micropython"
-        name: "RP2-Micropython"
-  
+      - name: Clone official MicroPython
+        run: git clone https://github.com/micropython/micropython.git --depth 1
+
+      - name: Clone ulab
+        run: git clone https://github.com/v923z/micropython-ulab.git --depth 1
+
+      - name: Copy ulab to modules
+        run: cp -r micropython-ulab/code micropython/ports/rp2/modules/ulab
+
+      - name: Build RP2040 firmware
+        run: |
+          cd micropython/ports/rp2
+          make BOARD=RPI_PICO -j4
+
+      - name: Upload firmware.uf2
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: micropython/ports/rp2/build-RPI_PICO/firmware.uf2
